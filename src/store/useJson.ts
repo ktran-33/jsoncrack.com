@@ -10,6 +10,8 @@ interface JsonActions {
 const initialStates = {
   json: "{}",
   loading: true,
+  //Ai generated below line
+  version: 0,
 };
 
 export type JsonStates = typeof initialStates;
@@ -18,11 +20,13 @@ const useJson = create<JsonStates & JsonActions>()((set, get) => ({
   ...initialStates,
   getJson: () => get().json,
   setJson: json => {
-    set({ json, loading: false });
+    //AI generated below line
+    set(state => ({ json, loading: false, version: (state.version ?? 0) + 1 }));
     useGraph.getState().setGraph(json);
   },
   clear: () => {
-    set({ json: "", loading: false });
+    //ai generated below line
+    set(state => ({ json: "", loading: false, version: (state.version ?? 0) + 1 }));
     useGraph.getState().clearGraph();
   },
 }));

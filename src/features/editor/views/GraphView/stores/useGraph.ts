@@ -3,6 +3,7 @@ import type { CanvasDirection } from "reaflow/dist/layout/elkLayout";
 import { create } from "zustand";
 import { SUPPORTED_LIMIT } from "../../../../../constants/graph";
 import useJson from "../../../../../store/useJson";
+import useFile from "../../../../../store/useFile";
 import type { EdgeData, NodeData } from "../../../../../types/graph";
 import { parser } from "../lib/jsonParser";
 
@@ -16,6 +17,8 @@ export interface Graph {
   selectedNode: NodeData | null;
   path: string;
   aboveSupportedLimit: boolean;
+  //Ai generated below line
+  refreshKey: number;
 }
 
 const initialStates: Graph = {
@@ -28,6 +31,8 @@ const initialStates: Graph = {
   selectedNode: null,
   path: "",
   aboveSupportedLimit: false,
+  //Ai generated below line
+  refreshKey: 0,
 };
 
 interface GraphActions {
@@ -43,6 +48,7 @@ interface GraphActions {
   centerView: () => void;
   clearGraph: () => void;
   setZoomFactor: (zoomFactor: number) => void;
+  updateNodeData: (newData: string) => void;
 }
 
 const useGraph = create<Graph & GraphActions>((set, get) => ({
@@ -101,6 +107,67 @@ const useGraph = create<Graph & GraphActions>((set, get) => ({
   },
   toggleFullscreen: fullscreen => set({ fullscreen }),
   setViewPort: viewPort => set({ viewPort }),
+
+  //AI-Generated Code Below
+updateNodeData: (newData: string) => {
+  const selectedNode = get().selectedNode;
+  if (!selectedNode) return;
+
+  try {
+    // Parse the new data
+    const parsedData = JSON.parse(newData);
+    const jsonState = useJson.getState();
+    const currentJson = JSON.parse(jsonState.json);
+
+    // Navigate to the node's path in the JSON and update it
+    let target: any = currentJson;
+    for (const key of selectedNode.path || []) {
+      target = target[key];
+    }
+
+    // Update the target with new data
+    Object.assign(target, parsedData);
+
+    // Update the JSON in the store
+    const updatedJsonString = JSON.stringify(currentJson, null, 2);
+    jsonState.setJson(updatedJsonString);
+
+    // Also update the file contents so the left panel reflects changes
+    const useFile = require("../../../../../store/useFile").default;
+    useFile.getState().setContents({ 
+      contents: updatedJsonString, 
+      hasChanges: true,
+      skipUpdate: true  // prevent double graph refresh
+    });
+
+    // Refresh the graph with updated data
+    get().setGraph(JSON.stringify(currentJson));
+
+    // bump refreshKey for other subscribers
+    set(state => ({ refreshKey: (state.refreshKey ?? 0) + 1 }));
+
+    // Update the selected node to reflect changes in real-time
+    const updatedNode = { ...selectedNode };
+    const allowedTypes = new Set(["string", "number", "boolean", "null", "array", "object"]);
+
+    updatedNode.text = Object.entries(parsedData).map(([key, value]) => {
+      const candidateType =
+        value === null ? "null" : Array.isArray(value) ? "array" : typeof value;
+
+      const nodeType = allowedTypes.has(candidateType) ? candidateType : "string";
+
+      return {
+        key,
+        value: String(value),
+        type: nodeType as any,
+      };
+    });
+
+    set({ selectedNode: updatedNode });
+  } catch (error) {
+    console.error("Failed to update node data:", error);
+  }
+}, 
 }));
 
 export default useGraph;
